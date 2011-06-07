@@ -439,10 +439,7 @@ def reindex_addons():
     from . import tasks
     # Make sure our mapping is up to date.
     search.setup_mapping()
-    ids = (Addon.objects.values_list('id', flat=True)
-           .filter(_current_version__isnull=False,
-                   status__in=amo.VALID_STATUSES,
-                   disabled_by_user=False))
+    ids = Addon.objects.values_list('id', flat=True)
     with establish_connection() as conn:
         for chunk in chunked(sorted(list(ids)), 150):
             tasks.index_addons.apply_async(args=[chunk], connection=conn)
