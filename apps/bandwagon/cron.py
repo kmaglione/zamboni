@@ -6,6 +6,7 @@ from django.db.models import Count
 
 import commonware.log
 from celery.messaging import establish_connection
+from celery.task.sets import TaskSet
 from celeryutils import task
 
 import amo
@@ -192,3 +193,13 @@ def _drop_collection_recs(**kw):
     # Go again if we found something to delete.
     if ids:
         _drop_collection_recs.delay()
+
+
+@cronjobs.register
+def reindex_collections():
+    from . import tasks
+    ids = (Collection.objects.exclude(type=amo.COLLECTION_SYNCHRONIZED)
+           .values_list('id', flat=True))
+    taskset = [tasks.index_collections.subtask(args=[chunk])
+               for chunk in chunked(sorted(list(ids)), 150)]
+    TaskSet(taskset).apply_async()
