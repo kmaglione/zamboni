@@ -666,7 +666,7 @@ function bind_viewer(nodes) {
 
     var buffer = '';
     $(document).bind('keypress', function(e) {
-        if (e.charCode && !(e.altKey || e.ctrlKey || e.metaKey)) {
+        if (e.charCode && !(e.altKey || e.ctrlKey || e.metaKey) && e.target == document.documentElement) {
             buffer += String.fromCharCode(e.charCode);
             if (keys.hasOwnProperty(buffer)) {
                 e.preventDefault();
