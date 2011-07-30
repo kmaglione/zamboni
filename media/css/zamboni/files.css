@@ -10,7 +10,7 @@
 
 #files li a {
     display: inline-block;
-    padding: 0px 4px 0px 20px;
+    padding: 1px 1px 2px 20px;
 }
 
 #files ul.root {
@@ -89,28 +89,38 @@ a.open {
     background: url('../../img/icons/minus.gif') 0 no-repeat;
 }
 
-a.diff {
+#files a > span {
+    -moz-boder-radius: 4px;
+    border-radius: 4px;
+    padding: 3px;
+}
+
+a.diff > span {
     background-color: #ffffcc;
 }
 
-a.known {
+a.known > span {
     color: #bbb;
 }
 
-#files a.notice, #files a.warning, #files a.error {
+#files a.notice > span, #files a.warning > span, #files a.error > span {
     margin: -1px;
 }
 
-#files a.notice {
+#files a.notice > span {
     border: 1px dotted blue;
 }
 
-#files a.warning.warning {
+#files a.warning.warning > span {
     border: 1px dotted red;
 }
 
-#files a.error.error.error {
+#files a.error.error.error > span {
     border: 1px solid red;
+}
+
+a.selected > span {
+    background-color: #ddf8dd;
 }
 
 .gutter a.notice, .gutter a.warning, .gutter a.error {
@@ -146,10 +156,6 @@ a.known {
 
 div.diff-bar {
     margin-left: -1px;
-}
-
-a.selected {
-    background-color: #ddf8dd;
 }
 
 .waiting {
