@@ -92,7 +92,7 @@ if (typeof SyntaxHighlighter !== 'undefined') {
         /* HTML parsing with regex warning disclaimer. This lib writes out
          * well formed lines with <code> and <a>. We want a hint
          * of the line length without all the syntax highlighting in it. */
-        var raw = code.replace(/<.*?>/g, '').replace(/&.*?;/g, ' ');
+        var raw = code.replace(/<.*?>/g, '').replace(/&.*?;/g, ' ').replace(/\t/g, '        ');
         if (raw.length > 80) {
             classes.push('longline');
         }
@@ -235,11 +235,47 @@ function bind_viewer(nodes) {
                 // Note SyntaxHighlighter has nuked the node and replaced it.
                 $diff = node.find('#diff');
                 this.size_line_numbers($diff, true);
+            }
 
+            this.compute_messages(node);
+
+            if (window.location.hash && window.location.hash != 'top') {
+                window.location = window.location;
+            }
+        };
+        this.compute_messages = function(node) {
+            var $diff = node.find('#diff'),
+                path = this.nodes.$files.find('a.file.selected').attr('data-short');
+
+            if (this.messages && this.messages.hasOwnProperty(path)) {
+                var messages = this.messages[path];
+                for (var i = 0; i < messages.length; i++) {
+                    var message = messages[i],
+                        $line = $("#L" + messages[i].line),
+                        title = $line.attr('title');
+
+                    $line.addClass(message.type)
+                         .attr('title', (title ? title + "\n\n\n" : "") +
+                               '<strong>' + message.type[0].toUpperCase() + message.type.substr(1) + ": " +
+                               message.message + '</strong>\n\n' +
+                               message.description)
+                         .attr('data-tooltip-html', 'true')
+                         .addClass('tooltip');
+
+                    if ($line.length) {
+                        $(".code ." + $line.parent().attr('class').match(/number\d+/)[0] + ":eq(0)")
+                             .addClass(message.type);
+                    }
+                }
+            }
+
+            if ($diff.length || messages) {
                 /* Build out the diff bar based on the line numbers. */
-                var $sb = $diff.siblings('.diff-bar').eq(0),
-                    $gutter = $diff.find('td.gutter'),
+                var $sb = $('.diff-bar'),
+                    $gutter = $('td.gutter'),
                     $lines = $gutter.find('div.line a');
+
+                $sb.empty();
 
                 if ($lines.length) {
                     var flush = function($line, bottom) {
@@ -284,9 +320,73 @@ function bind_viewer(nodes) {
                     this.updateViewport(true);
                 }
             }
+        }
+        this.update_validation = function(data) {
+            var viewer = this;
 
-            if (window.location.hash && window.location.hash != 'top') {
-                window.location = window.location;
+            $("#validating").hide();
+            if (data.validation) {
+                this.validation = data.validation;
+
+                this.messages = {};
+                var messages = data.validation.messages;
+                for (var i = 0; i < messages.length; i++) {
+                    var path = [].concat(messages[i].file).join("/");
+
+                    if (!this.messages[path])
+                        this.messages[path] = [];
+                    this.messages[path].push(messages[i]);
+                }
+
+                this.known_files = {};
+                var metadata = data.validation.metadata;
+                if (metadata && metadata.jetpack_identified_files) {
+                    var files = metadata.jetpack_identified_files;
+                    for (var file in files) {
+                        this.known_files[file] = ['JetPack'].concat(files[file]);
+                    }
+                }
+
+                this.nodes.$files.find('.file').each(function() {
+                    var $self = $(this);
+
+                    var known = viewer.known_files[$self.attr('data-short')];
+                    if (known) {
+                        $self.attr('title',
+                                   'Identified:\n' +
+                                   '    Library: ' + known[0] + ' ' + known[2] + '\n' +
+                                   '    Original path: ' + known[1])
+                             .addClass('known')
+                             .tooltip();
+                    }
+
+                    var messages = viewer.messages[$self.attr('data-short')];
+                    if (messages) {
+                        var types = {};
+                        for (var i = 0; i < messages.length; i++) {
+                            types[messages[i].type] = true;
+                        }
+                        for (var type in types) {
+                            $self.addClass(type);
+                        }
+                    }
+                });
+
+                this.nodes.$files.find('.directory').each(function() {
+                    var $self = $(this);
+                    var $ul = $self.parent().next();
+
+                    $.each(['warning', 'error', 'notice'], function(i, type) {
+                        if ($ul.find('.' + type + ':eq(0)').length) {
+                            $self.addClass(type);
+                        }
+                    });
+                    if (!$ul.find('.file:not(.known):eq(0)').length) {
+                        $self.addClass('known');
+                    }
+                });
+
+                this.compute_messages($('#content-wrapper'));
             }
         };
         this.updateViewport = function(resize) {
@@ -439,7 +539,9 @@ function bind_viewer(nodes) {
             }
         };
         this.next_delta = function(forward) {
-            var $deltas = $('td.code .line.add, td.code .line.delete'),
+            var classes = $("#diff").length ? 'add delete' : 'add delete warning notice error',
+                $deltas = $(classes.split(/ /g)
+                                   .map(function (className) { return 'td.code .line.' + className; }).join(', ')),
                 $lines = $('td.code .line');
             $lines.indexOf = Array.prototype.indexOf;
 
@@ -488,10 +590,8 @@ function bind_viewer(nodes) {
         viewer.toggle_leaf($(this));
     }));
 
-    if ($('#diff').length) {
-        $(window).resize(debounce(function () { viewer.updateViewport(true); }));
-        $(window).scroll(debounce(function () { viewer.updateViewport(false); }));
-    }
+    $(window).resize(debounce(function () { viewer.updateViewport(true); }));
+    $(window).scroll(debounce(function () { viewer.updateViewport(false); }));
 
     $('#files-up').click(_pd(function() {
         viewer.next_changed(-1);
@@ -523,6 +623,18 @@ function bind_viewer(nodes) {
         });
     }));
 
+    $.ajax({type: 'POST',
+            url: $('#metadata').attr('data-validate-url'),
+            data: {},
+            success: function(data) {
+                viewer.update_validation(data);
+            },
+            error: function(XMLHttpRequest, textStatus, errorThrown) {
+                viewer.update_validation(textStatus);
+            },
+            dataType: 'json'
+    });
+
     viewer.nodes.$files.find('.file').click(_pd(function() {
         viewer.select($(this));
         viewer.toggle_wrap('wrap');
@@ -532,7 +644,8 @@ function bind_viewer(nodes) {
         if (viewer.last != location.pathname) {
             viewer.nodes.$files.find('.file').each(function() {
                 if ($(this).attr('href') == location.pathname) {
-                    viewer.select($(this));
+                    if (!$(this).is('.selected'))
+                        viewer.select($(this));
                 }
             });
         }
@@ -592,8 +705,8 @@ function bind_viewer(nodes) {
     return viewer;
 }
 
+var viewer = null;
 $(document).ready(function() {
-    var viewer = null;
     var nodes = { files: '#files', thinking: '#thinking', commands: '#commands' };
     function poll_file_extraction() {
         $.getJSON($('#extracting').attr('data-url'), function(json) {

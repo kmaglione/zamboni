@@ -10,7 +10,7 @@
 
 #files li a {
     display: inline-block;
-    padding: 2px 20px;
+    padding: 0px 4px 0px 20px;
 }
 
 #files ul.root {
@@ -43,6 +43,11 @@ body.file-viewer div.section {
 
 #content-wrapper.full, #thinking.full {
     padding-left: 0;
+}
+
+#validating {
+    text-align: center;
+    margin-bottom: 1em;
 }
 
 span.number {
@@ -88,6 +93,57 @@ a.diff {
     background-color: #ffffcc;
 }
 
+a.known {
+    color: #bbb;
+}
+
+#files a.notice, #files a.warning, #files a.error {
+    margin: -1px;
+}
+
+#files a.notice {
+    border: 1px dotted blue;
+}
+
+#files a.warning.warning {
+    border: 1px dotted red;
+}
+
+#files a.error.error.error {
+    border: 1px solid red;
+}
+
+.gutter a.notice, .gutter a.warning, .gutter a.error {
+    margin: -1px;
+    -moz-border-radius: 3px;
+    border-radius: 3px;
+    border: 1px solid black;
+}
+.code .notice, .code .warning, .code .error {
+    margin: -1px;
+}
+
+.gutter a.notice, .diff-bar .notice.notice {
+    background-color: yellow;
+}
+.code .notice {
+    border: 1px dotted yellow;
+}
+
+.gutter a.warning.warning, .diff-bar .warning.warning.warning {
+    background-color: orange;
+}
+.code .warning.warning {
+    border: 1px dotted orange;
+}
+
+.gutter a.error.error.error, .diff-bar .error.error.error.error {
+    background-color: red;
+}
+.code .error.error.error {
+    border: 1px dotted red;
+}
+
 div.diff-bar {
     margin-left: -1px;
 }
@@ -123,7 +179,7 @@ a.selected {
     padding: 0 0 0 1ex;
 }
 
-#diff {
+#diff, #content {
     padding-left: 11px;
 }
 
@@ -172,6 +228,12 @@ td.gutter, td.code {
 
 #tooltip {
     max-width: 100%;
+}
+
+#tooltip > span {
+    white-space: pre-wrap;
+    text-align: left;
+    max-width: 70ex;
 }
 
 .number-combo {

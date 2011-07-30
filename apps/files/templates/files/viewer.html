@@ -11,7 +11,8 @@
 <div id="metadata" class="js-hidden"
      data-name="{{ addon.name }}"
      data-slug="{{ addon.slug }}"
-     data-version="{{ version }}"></div>
+     data-version="{{ version }}"
+     data-validate-url="{{ validate_url }}"></div>
 
 <h3>
     <a href="{{ file_link['url'] }}">{{ addon.name }} {{ version }}</a>
@@ -29,6 +30,9 @@
             </p>
             <div class="notification-box error js-hidden"></div>
         {% endif %}
+        <div id="validating">
+            <span class="waiting">{{ _('Fetching validation results...') }}</span>
+        </div>
         <div id="files">
             {% if files %}
                 <h4>{{ _('Files:') }}</h4>
@@ -46,10 +50,8 @@
                 <table id="commands">
                     <tr><th><code>k</code></th> <td><a href="#" id="files-up">{{ _('Up file') }}</a></td></tr>
                     <tr><th><code>j</code></th> <td><a href="#" id="files-down">{{ _('Down file') }}</a></td></tr>
-		{% if diff %}
-                    <tr><th><code>[c</code></th> <td><a href="#" id="files-change-prev">{{ _('Previous change') }}</a></td></tr>
-                    <tr><th><code>]c</code></th> <td><a href="#" id="files-change-next">{{ _('Next change') }}</a></td></tr>
-		{% endif %}
+                    <tr><th><code>[c</code></th> <td><a href="#" id="files-change-prev">{{ _('Previous noteworthy') }}</a></td></tr>
+                    <tr><th><code>]c</code></th> <td><a href="#" id="files-change-next">{{ _('Next noteworthy') }}</a></td></tr>
                     <tr><th><code>e</code></th> <td><a href="#" id="files-expand-all">{{ _('Expand all') }}</a></td></tr>
                     <tr><th><code>h</code></th> <td><a href="#" id="files-hide">{{ _('Hide or unhide tree') }}</a></td></tr>
                     <tr><th><code>w</code></th> <td><a href="#" id="files-wrap">{{ _('Wrap or unwrap text') }}</a></td></tr>
