@@ -165,6 +165,22 @@ jQuery.fn.numberInput = function(increment) {
     return this;
 };
 
+jQuery.fn.appendMessage = function(message) {
+    $(this).each(function() {
+        var $self = $(this),
+            $container = $self.find('.message-inner');
+
+        if (!$container.length) {
+            $container = $('<div>', { 'class': 'message-inner' });
+            $self.append($('<div>', { 'class': 'message' }).append($container))
+                 .addClass('message-container');
+        }
+
+        $container.append($('<div>')[typeof message == "string" ? 'text' : 'html'](message));
+    });
+    return this;
+}
+
 function bind_viewer(nodes) {
     $.each(nodes, function(x) {
         nodes['$'+x] = $(nodes[x]);
@@ -243,6 +259,11 @@ function bind_viewer(nodes) {
                 window.location = window.location;
             }
         };
+        this.message_type_map = {
+            'error': 'error',
+            'warning': 'warning',
+            'notice': 'info'
+        };
         this.compute_messages = function(node) {
             var $diff = node.find('#diff'),
                 path = this.nodes.$files.find('a.file.selected').attr('data-short');
@@ -251,20 +272,24 @@ function bind_viewer(nodes) {
                 var messages = this.messages[path];
                 for (var i = 0; i < messages.length; i++) {
                     var message = messages[i],
-                        $line = $("#L" + messages[i].line),
-                        title = $line.attr('title');
+                        $line = $('#L' + message.line),
+                        title = $line.attr('title'),
+                        dom = $('<div>').append($('<strong>').text(message.type[0].toUpperCase() + message.type.substr(1) + ': ' +
+                                                                    message.message))
+                                         .append($('<p>').html(message.description));
 
-                    $line.addClass(message.type)
-                         .attr('title', (title ? title + "\n\n\n" : "") +
-                               '<strong>' + message.type[0].toUpperCase() + message.type.substr(1) + ": " +
-                               message.message + '</strong>\n\n' +
-                               message.description)
-                         .attr('data-tooltip-html', 'true')
-                         .addClass('tooltip');
+                    if (message.line != null && $line.length) {
+                        $line.addClass(message.type)
+                             .parent()
+                             .appendMessage(dom);
 
-                    if ($line.length) {
-                        $(".code ." + $line.parent().attr('class').match(/number\d+/)[0] + ":eq(0)")
+                        $('.code .' + $line.parent().attr('class').match(/number\d+/)[0] + ':eq(0)')
                              .addClass(message.type);
+                    } else {
+                        $('#diff-wrapper').before(
+                            $('<div>', { 'class': 'notification-box' })
+                                .addClass(this.message_type_map[message.type])
+                                .append(dom));
                     }
                 }
             }
@@ -273,7 +298,7 @@ function bind_viewer(nodes) {
                 /* Build out the diff bar based on the line numbers. */
                 var $sb = $('.diff-bar'),
                     $gutter = $('td.gutter'),
-                    $lines = $gutter.find('div.line a');
+                    $lines = $gutter.find('div.line > a');
 
                 $sb.empty();
 
@@ -291,8 +316,12 @@ function bind_viewer(nodes) {
                             style['margin-bottom'] = '-1px';
                         }
 
-                        $sb.append($('<a>', { 'href': $start.attr('href'), 'class': $start.attr('class'),
-                                              'css': style }));
+                        var $link = $('<a>', { 'href': $start.attr('href'), 'class': $start.attr('class'),
+                                               'css': style }).appendTo($sb);
+
+                        if ($start.is('.error, .notice, .warning')) {
+                            $link.appendMessage($start.parent().find('.message-inner > div').clone());
+                        }
 
                         $prev = $start;
                         $start = $line;
@@ -324,7 +353,7 @@ function bind_viewer(nodes) {
         this.update_validation = function(data) {
             var viewer = this;
 
-            $("#validating").hide();
+            $('#validating').hide();
             if (data.validation) {
                 this.validation = data.validation;
 
@@ -357,7 +386,7 @@ function bind_viewer(nodes) {
                                    '    Library: ' + known[0] + ' ' + known[2] + '\n' +
                                    '    Original path: ' + known[1])
                              .addClass('known')
-                             .tooltip();
+                             .addClass('tooltip');
                     }
 
                     var messages = viewer.messages[$self.attr('data-short')];
@@ -388,6 +417,14 @@ function bind_viewer(nodes) {
 
                 this.compute_messages($('#content-wrapper'));
             }
+
+            var error = data.error || typeof data == "string" && data ||
+                    data && typeof data != "object";
+            if (error) {
+                $('#validating').after($('<div>', { 'class': 'notification-box error' })
+                                            .text($("#metadata").attr('data-validation-failed') + ' ' +
+                                                  error));
+            }
         };
         this.updateViewport = function(resize) {
             var $viewport = this.$viewport,
@@ -406,9 +443,9 @@ function bind_viewer(nodes) {
             if (resize) {
                 var height = gutter_height + Math.min(0, gutter.top) - Math.max(gutter.bottom - window_height, 0);
 
-                $viewport.css({ 'height': height * 100 / gutter_height + "%", 'top': diffbar_top });
+                $viewport.css({ 'height': height * 100 / gutter_height + '%', 'top': diffbar_top });
 
-                $diffbar.css({ 'height': Math.min($("#diff-wrapper").height(), window_height) + "px" });
+                $diffbar.css({ 'height': Math.min($('#diff-wrapper').height(), window_height) + "px" });
             } else {
                 $viewport.css({ 'top': diffbar_top });
             }
@@ -521,13 +558,14 @@ function bind_viewer(nodes) {
         this.next_changed = function(offset) {
             var $files = this.nodes.$files.find('a.file'),
                 selected = $files[this.get_selected()],
-                isDiff = $('#diff').length;
+                isDiff = $('#diff').length,
+                filter = (isDiff ? '.diff' : '') + ':not(.known)';
 
             var a = [], list = a;
             $files.each(function () {
                 if (this == selected) {
                     list = [selected];
-                } else if (config.needreview_pattern.test($(this).attr('data-short')) && (!isDiff || $(this).hasClass('diff'))) {
+                } else if (config.needreview_pattern.test($(this).attr('data-short')) && $(this).is(filter)) {
                     list.push(this);
                 }
             });
@@ -539,7 +577,7 @@ function bind_viewer(nodes) {
             }
         };
         this.next_delta = function(forward) {
-            var classes = $("#diff").length ? 'add delete' : 'add delete warning notice error',
+            var classes = $("#diff").length ? 'add delete' : 'warning notice error',
                 $deltas = $(classes.split(/ /g)
                                    .map(function (className) { return 'td.code .line.' + className; }).join(', ')),
                 $lines = $('td.code .line');
@@ -694,12 +732,13 @@ function bind_viewer(nodes) {
         var $tabstops = $('#tab-stops')
             .numberInput(4)
             .val(Number(storage.get(localTabstopsKey) || storage.get(tabstopsKey)) || 4)
-            .change(function() {
+            .change(function(event, global) {
                 rule.style.tabSize = rule.style.MozTabSize = $(this).val();
-                storage.set(localTabstopsKey, $(this).val());
+                if (!global)
+                    storage.set(localTabstopsKey, $(this).val());
                 storage.set(tabstopsKey, $(this).val());
             })
-            .change();
+            .trigger('change', true);
     }
 
     return viewer;
