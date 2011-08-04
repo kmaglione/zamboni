@@ -1,42 +1,5 @@
 "use strict";
 
-if (typeof diff_match_patch !== 'undefined') {
-    diff_match_patch.prototype.diff_prettyHtml = function(diffs) {
-        /* An override of prettyHthml from diff_match_patch. This
-           one will not put any style attrs in the ins or del. */
-        var html = [];
-        for (var x = 0; x < diffs.length; x++) {
-            var op = diffs[x][0];    // Operation (insert, delete, equal)
-            var data = diffs[x][1];  // Text of change.
-            var lines = data.split('\n');
-            for (var t = 0; t < lines.length; t++) {
-                /* A diff gets an empty element on the end (the last \n).
-                   Unless the diff line in question does not have a new line on
-                   the end. We can't just set lines.length - 1, because this
-                   will just chop off lines. But if we don't trim these empty
-                   lines we'll end up with lines between each diff. */
-                if ((t + 1) == lines.length && lines[t] == '') {
-                    continue;
-                }
-                switch (op) {
-                    /* The syntax highlighter needs an extra space
-                       to do it's work. */
-                    case DIFF_INSERT:
-                        html.push('+ ' + lines[t] + '\n');
-                        break;
-                    case DIFF_DELETE:
-                        html.push('- ' + lines[t] + '\n');
-                        break;
-                    case DIFF_EQUAL:
-                        html.push('  ' + lines[t] + '\n');
-                        break;
-                }
-            }
-        }
-        return html.join('');
-    };
-}
-
 var config = {
     diff_context: 2,
     needreview_pattern: /\.(js|jsm|xul|xml|x?html?|manifest|sh|py)$/i
@@ -222,12 +185,7 @@ function bind_viewer(nodes) {
             }
 
             if ($diff.length) {
-                var dmp = new diff_match_patch();
-                // Line diffs http://code.google.com/p/google-diff-match-patch/wiki/LineOrWordDiffs
-                var a = dmp.diff_linesToChars_($diff.siblings('.right').text(), $diff.siblings('.left').text());
-                var diffs = dmp.diff_main(a[0], a[1], false);
-                dmp.diff_charsToLines_(diffs, a[2]);
-                $diff.text(dmp.diff_prettyHtml(diffs)).show();
+                $diff.text($diff.text().replace(/^./gm, '$& '));
 
                 /* Reset the syntax highlighter variables. */
                 SyntaxHighlighter.amo_vars = {'deletions': {}, 'additions': {}, 'is_diff': true};

@@ -114,7 +114,7 @@ def compare(request, diff, key=None, type='file'):
         diff.select(key)
         data['key'] = key
         if diff.is_diffable():
-            data['left'], data['right'] = diff.read_file()
+            data['content'] = diff.read_diff()
 
     else:
         extract_file.delay(diff.left)

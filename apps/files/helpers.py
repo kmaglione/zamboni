@@ -1,8 +1,10 @@
 import codecs
 import mimetypes
 import os
+import re
 import shutil
 import stat
+import subprocess
 
 from django.conf import settings
 from django.utils.datastructures import SortedDict
@@ -28,6 +30,8 @@ blacklisted_extensions = [b for b in list(blacklisted_extensions)
                             if b != 'sh']
 task_log = commonware.log.getLogger('z.task')
 
+def call(*args):
+    return subprocess.Popen(map(str, args), stdout=subprocess.PIPE).communicate()[0].decode('utf-8')
 
 @register.function
 def file_viewer_class(value, key):
@@ -66,6 +70,8 @@ class FileViewer:
         self.src = file_obj.file_path
         self.dest = os.path.join(settings.TMP_PATH, 'file_viewer',
                                  str(file_obj.pk))
+        self.temp = os.path.join(settings.TMP_PATH, 'file_viewer',
+                                 '%s.temp' % str(file_obj.pk))
         self._files, self.selected = None, None
 
     def __str__(self):
@@ -102,6 +108,8 @@ class FileViewer:
     def cleanup(self):
         if os.path.exists(self.dest):
             shutil.rmtree(self.dest)
+        if os.path.exists(self.temp):
+            shutil.rmtree(self.temp)
 
     def is_search_engine(self):
         """Is our file for a search engine?"""
@@ -163,6 +171,17 @@ class FileViewer:
                 #L10n: {0} is the filename.
                 self.selected['msg'] = _('Problems decoding with: %s.') % codec
                 return cont
+
+    def stage_temp_file(self):
+        try:
+            os.makedirs(self.temp)
+        except OSError, err:
+            pass
+
+        file = open(os.path.join(self.temp, self.selected['md5']), 'w+')
+        file.write(self.read_file(True).encode('utf-8'))
+        file.seek(0)
+        return file
 
     def select(self, file):
         self.selected = self.get_files().get(file)
@@ -354,10 +373,18 @@ class DiffHelper:
 
         return different
 
-    def read_file(self):
+    def read_diff(self):
         """Reads both selected files."""
-        return [self.left.read_file(allow_empty=True),
-                self.right.read_file(allow_empty=True)]
+        left = self.left.stage_temp_file()
+        right = self.right.stage_temp_file()
+
+        diff = call('diff', '-dwU', 1<<31, left.name, right.name)
+        diff = re.sub('^.*\n.*\n.*\n', '', diff) if diff else \
+               re.sub('(?m)^', ' ', right.read().decode('utf-8'))
+
+        for file in (left, right):
+            os.unlink(file.name)
+        return diff
 
     def select(self, key):
         """
