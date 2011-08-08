@@ -72,7 +72,7 @@ if (typeof SyntaxHighlighter !== 'undefined') {
         return html;
     };
 
-    SyntaxHighlighter.Highlighter.prototype.getLineHtml = function(lineIndex, lineNumber, code)	{
+    SyntaxHighlighter.Highlighter.prototype.getLineHtml = function(lineIndex, lineNumber, code) {
         var classes = [
             'original',
             'line',
@@ -91,7 +91,10 @@ if (typeof SyntaxHighlighter !== 'undefined') {
 
         /* HTML parsing with regex warning disclaimer. This lib writes out
          * well formed lines with <code> and <a>. We want a hint
-         * of the line length without all the syntax highlighting in it. */
+         * of the line length without all the syntax highlighting in it.
+         * We also need to expand tab characters to the long end of
+         * likely values to make sure long tab-indented lines are
+         * processed. */
         var raw = code.replace(/<.*?>/g, '').replace(/&.*?;/g, ' ').replace(/\t/g, '        ');
         if (raw.length > 80) {
             classes.push('longline');
@@ -123,13 +126,11 @@ jQuery.fn.numberInput = function(increment) {
 
         var height = $self.outerHeight() / 2;
 
-        var $dom = $('<span>').attr({ 'class': 'number-combo' })
-                     .append($('<a>').attr({ 'class': 'number-combo-button-down',
-                                             'href': '#' })
-                                     .text('↓'))
-                     .append($('<a>').attr({ 'class': 'number-combo-button-up',
-                                             'href': '#' })
-                                     .text('↑'));
+        var $dom = $('<span>', { 'class': 'number-combo' })
+                     .append($('<a>', { 'class': 'number-combo-button-down',
+                                        'href': '#', 'text': '↓' }))
+                     .append($('<a>', { 'class': 'number-combo-button-up',
+                                        'href': '#', 'text': '↑' }));
 
         var $up = $dom.find('.number-combo-button-up').click(_pd(function(event, count) {
             count = count || (event.ctrlKey ? increment : 1) || 1;
@@ -179,7 +180,7 @@ jQuery.fn.appendMessage = function(message) {
         $container.append($('<div>')[typeof message == "string" ? 'text' : 'html'](message));
     });
     return this;
-}
+};
 
 function bind_viewer(nodes) {
     $.each(nodes, function(x) {
@@ -213,16 +214,19 @@ function bind_viewer(nodes) {
             /* We need to re-size the line numbers correctly depending upon
                the wrapping. */
 
-            var self = this;
-            $node.each(function(){
+            $node.each(function() {
                 var $self = $(this),
-                    long_lines = $(this).find('td.code div.longline');
+                    long_lines = $(this).find('td.code div.longline'),
+                    changes = [];
                 /* Use the longline hint to guess at long lines and
                  * see what needs resizing. */
                 $.each(long_lines, function() {
                     var $this = $(this),
                         k = parseInt($this.attr('class').match(/index(\d+)/)[1], 10);
-                    $self.find('td.gutter div.index' + k).css('height',  $this.height() + 'px');
+                    changes.push(['td.gutter div.index' + k + ':eq(0)', $this.height() + 'px']);
+                });
+                $.each(changes, function(i, change) {
+                    $self.find(change[0]).css('height', change[1]);
                 });
             });
             this.updateViewport(true);
@@ -274,14 +278,16 @@ function bind_viewer(nodes) {
                     var message = messages[i],
                         $line = $('#L' + message.line),
                         title = $line.attr('title'),
-                        dom = $('<div>').append($('<strong>').text(message.type[0].toUpperCase() + message.type.substr(1) + ': ' +
-                                                                    message.message))
+                        $dom = $('<div>').append($('<strong>').text(format('{0}{1}: {2}',
+                                                                           message.type[0].toUpperCase(),
+                                                                           message.type.substr(1),
+                                                                           message.message)))
                                          .append($('<p>').html(message.description));
 
                     if (message.line != null && $line.length) {
                         $line.addClass(message.type)
                              .parent()
-                             .appendMessage(dom);
+                             .appendMessage($dom);
 
                         $('.code .' + $line.parent().attr('class').match(/number\d+/)[0] + ':eq(0)')
                              .addClass(message.type);
@@ -289,7 +295,7 @@ function bind_viewer(nodes) {
                         $('#diff-wrapper').before(
                             $('<div>', { 'class': 'notification-box' })
                                 .addClass(this.message_type_map[message.type])
-                                .append(dom));
+                                .append($dom));
                     }
                 }
             }
@@ -303,6 +309,7 @@ function bind_viewer(nodes) {
                 $sb.empty();
 
                 if ($lines.length) {
+                    var changes = [];
                     var flush = function($line, bottom) {
                         var height = (bottom - $start.offset().top) * 100 / $gutter.height(),
                             style = { 'height': height + "%" };
@@ -316,19 +323,14 @@ function bind_viewer(nodes) {
                             style['margin-bottom'] = '-1px';
                         }
 
-                        var $link = $('<a>', { 'href': $start.attr('href'), 'class': $start.attr('class'),
-                                               'css': style }).appendTo($sb);
-
-                        if ($start.is('.error, .notice, .warning')) {
-                            $link.appendMessage($start.parent().find('.message-inner > div').clone());
-                        }
+                        changes.push([$start, style]);
 
                         $prev = $start;
                         $start = $line;
                     };
 
                     var $prev, $start = null;
-                    $lines.each(function () {
+                    $lines.each(function() {
                         var $line = $(this);
                         if (!$start) {
                             $start = $line;
@@ -337,6 +339,17 @@ function bind_viewer(nodes) {
                         }
                     });
                     flush(null, $gutter.offset().top + $gutter.height());
+
+                    $.each(changes, function(i, change) {
+                        var $start = change[0], style = change[1];
+
+                        var $link = $('<a>', { 'href': $start.attr('href'), 'class': $start.attr('class'),
+                                               'css': style }).appendTo($sb);
+
+                        if ($start.is('.error, .notice, .warning')) {
+                            $link.appendMessage($start.parent().find('.message-inner > div').clone());
+                        }
+                    });
 
                     this.$diffbar = $sb;
                     this.$viewport = $('<div>', { 'class': 'diff-bar-viewport' });
@@ -362,8 +375,9 @@ function bind_viewer(nodes) {
                 for (var i = 0; i < messages.length; i++) {
                     var path = [].concat(messages[i].file).join("/");
 
-                    if (!this.messages[path])
+                    if (!this.messages[path]) {
                         this.messages[path] = [];
+                    }
                     this.messages[path].push(messages[i]);
                 }
 
@@ -382,9 +396,10 @@ function bind_viewer(nodes) {
                     var known = viewer.known_files[$self.attr('data-short')];
                     if (known) {
                         $self.attr('title',
-                                   'Identified:\n' +
-                                   '    Library: ' + known[0] + ' ' + known[2] + '\n' +
-                                   '    Original path: ' + known[1])
+                                   format('Identified:\n' +
+                                          '    Library: {0} {2}\n' +
+                                          '    Original path: {1}',
+                                          known))
                              .addClass('known')
                              .addClass('tooltip');
                     }
@@ -419,11 +434,13 @@ function bind_viewer(nodes) {
             }
 
             var error = data.error || typeof data == "string" && data ||
-                    data && typeof data != "object";
+                        data && typeof data != "object";
             if (error) {
-                $('#validating').after($('<div>', { 'class': 'notification-box error' })
-                                            .text($("#metadata").attr('data-validation-failed') + ' ' +
-                                                  error));
+                $('#validating').after(
+                    $('<div>', { 'class': 'notification-box error',
+                                 'text': format('{1} {2}',
+                                                $("#metadata").attr('data-validation-failed'),
+                                                error) }));
             }
         };
         this.updateViewport = function(resize) {
@@ -535,11 +552,13 @@ function bind_viewer(nodes) {
             });
             return k;
         };
-        this.toggle_wrap = function(state) {
+        this.toggle_wrap = function(state, quick) {
             /* Toggles the content wrap in the page, starts off wrapped */
             this.wrapped = (state == 'wrap' || !this.wrapped);
             $('code').toggleClass('unwrapped');
-            this.size_line_numbers($('#content-wrapper'), false);
+            if (!quick) {
+                this.size_line_numbers($('#content-wrapper'), false);
+            }
         };
         this.toggle_files = function(state) {
             this.hidden = (state == 'hide' || !this.hidden);
@@ -562,7 +581,7 @@ function bind_viewer(nodes) {
                 filter = (isDiff ? '.diff' : '') + ':not(.known)';
 
             var a = [], list = a;
-            $files.each(function () {
+            $files.each(function() {
                 if (this == selected) {
                     list = [selected];
                 } else if (config.needreview_pattern.test($(this).attr('data-short')) && $(this).is(filter)) {
@@ -579,7 +598,7 @@ function bind_viewer(nodes) {
         this.next_delta = function(forward) {
             var classes = $("#diff").length ? 'add delete' : 'warning notice error',
                 $deltas = $(classes.split(/ /g)
-                                   .map(function (className) { return 'td.code .line.' + className; }).join(', ')),
+                                   .map(function(className) { return 'td.code .line.' + className; }).join(', ')),
                 $lines = $('td.code .line');
             $lines.indexOf = Array.prototype.indexOf;
 
@@ -628,8 +647,8 @@ function bind_viewer(nodes) {
         viewer.toggle_leaf($(this));
     }));
 
-    $(window).resize(debounce(function () { viewer.updateViewport(true); }));
-    $(window).scroll(debounce(function () { viewer.updateViewport(false); }));
+    $(window).resize(debounce(function() { viewer.updateViewport(true); }));
+    $(window).scroll(debounce(function() { viewer.updateViewport(false); }));
 
     $('#files-up').click(_pd(function() {
         viewer.next_changed(-1);
@@ -661,29 +680,34 @@ function bind_viewer(nodes) {
         });
     }));
 
-    $.ajax({type: 'POST',
-            url: $('#metadata').attr('data-validate-url'),
-            data: {},
-            success: function(data) {
-                viewer.update_validation(data);
-            },
-            error: function(XMLHttpRequest, textStatus, errorThrown) {
-                viewer.update_validation(textStatus);
-            },
-            dataType: 'json'
-    });
+    if ($('#metadata').attr('data-validate-url')) {
+        $('#validating').css('display', 'block');
+
+        $.ajax({type: 'POST',
+                url: $('#metadata').attr('data-validate-url'),
+                data: {},
+                success: function(data) {
+                    viewer.update_validation(data);
+                },
+                error: function(XMLHttpRequest, textStatus, errorThrown) {
+                    viewer.update_validation(textStatus);
+                },
+                dataType: 'json'
+        });
+    }
 
     viewer.nodes.$files.find('.file').click(_pd(function() {
         viewer.select($(this));
-        viewer.toggle_wrap('wrap');
+        viewer.toggle_wrap('wrap', true);
     }));
 
     $(window).bind('popstate', function() {
         if (viewer.last != location.pathname) {
             viewer.nodes.$files.find('.file').each(function() {
                 if ($(this).attr('href') == location.pathname) {
-                    if (!$(this).is('.selected'))
+                    if (!$(this).is('.selected')) {
                         viewer.select($(this));
+                    }
                 }
             });
         }
@@ -691,7 +715,7 @@ function bind_viewer(nodes) {
 
     var prefixes = {},
         keys = {};
-    $('#commands code').each(function () {
+    $('#commands code').each(function() {
         var $code = $(this),
             $link = $code.parents('tr').find('a'),
             key = $code.text();
