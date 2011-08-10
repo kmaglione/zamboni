@@ -278,7 +278,7 @@ function bind_viewer(nodes) {
                     var message = messages[i],
                         $line = $('#L' + message.line),
                         title = $line.attr('title'),
-                        $dom = $('<div>').append($('<strong>').text(format('{0}{1}: {2}',
+                        $dom = $('<div>').append($('<strong>').html(format('{0}{1}: {2}',
                                                                            message.type[0].toUpperCase(),
                                                                            message.type.substr(1),
                                                                            message.message)))
@@ -455,17 +455,14 @@ function bind_viewer(nodes) {
             var gutter = $gutter[0].getBoundingClientRect(),
                 gutter_height = gutter.bottom - gutter.top,
                 window_height = $(window).height(),
-                diffbar_top = -Math.min(0, gutter.top) * 100 / gutter_height + "%";
+                diffbar_top = -Math.min(0, gutter.top) * 100 / gutter_height + "%",
+                height = Math.max(0, gutter_height + Math.min(0, gutter.top) - Math.max(gutter.bottom - window_height, 0));
 
             if (resize) {
-                var height = gutter_height + Math.min(0, gutter.top) - Math.max(gutter.bottom - window_height, 0);
-
-                $viewport.css({ 'height': height * 100 / gutter_height + '%', 'top': diffbar_top });
-
                 $diffbar.css({ 'height': Math.min($('#diff-wrapper').height(), window_height) + "px" });
-            } else {
-                $viewport.css({ 'top': diffbar_top });
             }
+
+            $viewport.css({ 'height': height * 100 / gutter_height + '%', 'top': diffbar_top });
 
             if (gutter.bottom <= window_height) {
                 $diffbar.css({ 'position': 'absolute', 'top': '', 'bottom': '0' });
