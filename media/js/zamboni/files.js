@@ -281,8 +281,11 @@ function bind_viewer(nodes) {
                         $dom = $('<div>').append($('<strong>').html(format('{0}{1}: {2}',
                                                                            message.type[0].toUpperCase(),
                                                                            message.type.substr(1),
-                                                                           message.message)))
-                                         .append($('<p>').html(message.description));
+                                                                           message.message)));
+
+                    $.each([].concat(message.description), function(i, msg) {
+                        $dom.append($('<p>').html(String(message.description)));
+                    });
 
                     if (message.line != null && $line.length) {
                         $line.addClass(message.type)
@@ -725,7 +728,9 @@ function bind_viewer(nodes) {
 
     var buffer = '';
     $(document).bind('keypress', function(e) {
-        if (e.charCode && !(e.altKey || e.ctrlKey || e.metaKey) && e.target == document.documentElement) {
+        if (e.charCode && !(e.altKey || e.ctrlKey || e.metaKey) &&
+                ![HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement]
+                    .some(function (iface) { return e.target instanceof iface })) {
             buffer += String.fromCharCode(e.charCode);
             if (keys.hasOwnProperty(buffer)) {
                 e.preventDefault();
