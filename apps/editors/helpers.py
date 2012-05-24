@@ -525,7 +525,7 @@ class ReviewHelper:
         return self.actions[action]['method']()
 
 
-class ReviewBase:
+class ReviewBase(object):
 
     def __init__(self, request, addon, version, review_type):
         self.request = request
@@ -616,8 +616,18 @@ class ReviewBase:
                    [settings.SENIOR_EDITORS_EMAIL],
                    Context(self.get_context_data()))
 
+    def process_comment(self):
+        self.version.update(has_editor_comment=True)
+        self.log_action(amo.LOG.COMMENT_VERSION)
+
 
 class ReviewAddon(ReviewBase):
+
+    def __init__(self, *args, **kwargs):
+        super(ReviewAddon, self).__init__(*args, **kwargs)
+
+        self.is_upgrade = (self.addon.status is amo.STATUS_LITE_AND_NOMINATED and
+                           self.review_type == 'nominated')
 
     def set_data(self, data):
         self.data = data
@@ -648,7 +658,11 @@ class ReviewAddon(ReviewBase):
 
     def process_sandbox(self):
         """Set an addon back to sandbox."""
-        self.set_addon(status=amo.STATUS_NULL)
+
+        # TODO: If this is the only version for the add-on, we need
+        # STATUS_NULL
+        self.set_addon(status=amo.STATUS_LITE if self.is_upgrade else amo.STATUS_NULL)
+
         self.set_files(amo.STATUS_DISABLED, self.version.files.all(),
                        hide_disabled_file=True)
 
@@ -695,10 +709,6 @@ class ReviewAddon(ReviewBase):
         self.notify_email('author_super_review',
                           u'Mozilla Add-ons: %s %s flagged for Admin Review')
         self.send_super_mail()
-
-    def process_comment(self):
-        self.version.update(has_editor_comment=True)
-        self.log_action(amo.LOG.COMMENT_VERSION)
 
 
 class ReviewFiles(ReviewBase):
@@ -775,7 +785,3 @@ class ReviewFiles(ReviewBase):
                           u'Mozilla Add-ons: %s %s flagged for Admin Review')
 
         self.send_super_mail()
-
-    def process_comment(self):
-        self.version.update(has_editor_comment=True)
-        self.log_action(amo.LOG.COMMENT_VERSION)
