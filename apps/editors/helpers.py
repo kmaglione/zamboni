@@ -559,6 +559,8 @@ class ReviewBase(object):
                    'reviewtype': self.review_type}
         if self.files:
             details['files'] = [f.id for f in self.files]
+        if self.version:
+            details['version'] = self.version.version
 
         amo.log(action, self.addon, self.version, user=self.user.get_profile(),
                 created=datetime.now(), details=details)
