@@ -150,6 +150,8 @@ class File(amo.models.OnChangeMixin, amo.models.ModelBase):
         f = cls(version=version, platform=platform)
         upload.path = amo.utils.smart_path(nfd_str(upload.path))
         ext = os.path.splitext(upload.path)[1]
+        if ext == '.jar':
+            ext = '.xpi'
         f.filename = f.generate_filename(extension=ext or '.xpi')
         # Size in kilobytes.
         f.size = int(max(1, round(storage.size(upload.path) / 1024, 0)))
