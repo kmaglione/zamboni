@@ -1498,6 +1498,74 @@ class TestReview(ReviewBase):
             eq_(td.find('th').text(), 'Preliminarily approved')
             eq_(td.find('td a').text(), self.editor.display_name)
 
+    def test_item_history_deleted(self):
+        # Deleted version: 0.1
+        addon = self.addon_file(u'something', u'0.1', amo.STATUS_PUBLIC,
+                                amo.STATUS_UNREVIEWED)
+
+        self.addon = addon
+        self.url = reverse('editors.review', args=[addon.slug])
+
+        v = addon.versions.all()[0]
+        eq_(addon.versions.count(), 1)
+
+        self.client.post(self.url, {'action': 'comment',
+                                    'comments': 'millenium hand and shrimp'})
+
+        v.delete()
+        eq_(addon.versions.count(), 0)
+
+        # Deleted version: 0.1
+        self.addon_file(u'something', u'0.1', amo.STATUS_PUBLIC,
+                        amo.STATUS_UNREVIEWED)
+
+        v = addon.versions.all()[0]
+        eq_(addon.versions.count(), 1)
+
+        self.review_version(v, self.url)
+
+        v.delete()
+        eq_(addon.versions.count(), 0)
+
+        # Deleted version: 0.2
+        self.addon_file(u'something', u'0.2', amo.STATUS_PUBLIC,
+                        amo.STATUS_UNREVIEWED)
+
+        v = addon.versions.all()[0]
+        eq_(addon.versions.count(), 1)
+
+        self.client.post(self.url, {'action': 'comment',
+                                    'comments': 'millenium hand and shrimp'})
+
+        v.delete()
+        eq_(addon.versions.count(), 0)
+
+        # Non-deleted version: 0.3
+        self.addon_file(u'something', u'0.3', amo.STATUS_PUBLIC,
+                        amo.STATUS_UNREVIEWED)
+
+        v = addon.versions.all()[0]
+        v.update(created=v.created + timedelta(days=1))
+
+        eq_(addon.versions.count(), 1)
+
+        r = self.client.get(self.url)
+        table = pq(r.content)('#review-files')
+
+        # Check the history for all versions.
+        ths = table.children('tr > th')
+        eq_(ths.length, 3) # The two with the same number will be coalesced
+        assert '0.1' in ths.eq(0).text()
+        assert '0.2' in ths.eq(1).text()
+        assert '0.3' in ths.eq(2).text()
+        for idx in xrange(2):
+            assert 'Deleted' in ths.eq(idx).text();
+
+        bodies = table.children('.listing-body')
+        assert 'millenium hand and shrimp' in bodies.eq(0).text()
+        assert 'something' in bodies.eq(0).text()
+        assert 'millenium hand and shrimp' in bodies.eq(1).text()
+
     def test_item_history_compat_ordered(self):
         """ Make sure that apps in compatibility are ordered. """
         self.addon_file(u'something', u'0.2', amo.STATUS_PUBLIC,
