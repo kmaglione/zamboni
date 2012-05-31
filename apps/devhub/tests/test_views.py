@@ -2998,6 +2998,41 @@ class TestAddVersion(UploadTest):
         eq_(len(version.all_files), 2)
 
 
+class TestAddBetaVersion(TestAddVersion):
+    fixtures = ['base/apps', 'base/users', 'base/appversion',
+                'base/addon_3615', 'base/platforms']
+
+    def setUp(self):
+        super(TestAddBetaVersion, self).setUp()
+
+        self.do_upload()
+
+    def do_upload(self):
+        self.upload = self.get_upload('extension-0.2b1.xpi')
+
+    def post_additional(self, version, platform=amo.PLATFORM_MAC):
+        url = reverse('devhub.versions.add_file',
+                      args=[self.addon.slug, version.id])
+        return self.client.post(url, dict(upload=self.upload.pk,
+                                          platform=platform.id))
+
+    def test_add_multi_file_beta(self):
+        r = self.post(desktop_platforms=[amo.PLATFORM_MAC])
+
+        version = self.addon.versions.all().order_by("-id")[0]
+
+        # Make sure that the first file is beta
+        fle = File.objects.all().order_by("-id")[0]
+        eq_(fle.status, amo.STATUS_BETA)
+
+        self.do_upload()
+        r = self.post_additional(version, platform=amo.PLATFORM_LINUX)
+        eq_(r.status_code, 200)
+
+        # Make sure that the additional files are beta
+        fle = File.objects.all().order_by("-id")[0]
+        eq_(fle.status, amo.STATUS_BETA)
+
 class TestVersionXSS(UploadTest):
 
     def test_unique_version_num(self):
