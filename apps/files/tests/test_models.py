@@ -633,8 +633,11 @@ class TestFileFromUpload(UploadTest):
         self.version = Version.objects.create(addon=self.addon)
 
     def upload(self, name):
+        if os.path.splitext(name)[-1] not in ['.xml', '.xpi', '.jar']:
+            name = name + '.xpi'
+
         v = json.dumps(dict(errors=0, warnings=1, notices=2, metadata={}))
-        d = dict(path=self.xpi_path(name), name='%s.xpi' % name,
+        d = dict(path=self.xpi_path(name), name=name,
                  hash='sha256:%s' % name, validation=v)
         return FileUpload.objects.create(**d)
 
@@ -795,6 +798,11 @@ class TestFileFromUpload(UploadTest):
         data = parse_addon(upload.path)
         f = File.from_upload(upload, self.version, self.platform, data)
         eq_(f.strict_compatibility, True)
+
+    def test_theme_extension(self):
+        upload = self.upload('theme.jar')
+        f = File.from_upload(upload, self.version, self.platform)
+        eq_(f.filename.endswith('.xpi'), True)
 
 
 class TestZip(amo.tests.TestCase, amo.tests.AMOPaths):
