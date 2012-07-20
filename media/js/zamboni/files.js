@@ -257,36 +257,41 @@ function bind_viewer(nodes) {
         };
         this.compute_messages = function(node) {
             var $diff = node.find('#diff'),
-                path = this.nodes.$files.find('a.file.selected').attr('data-short');
+                path = this.nodes.$files.find('a.file.selected').attr('data-short'),
+                messages = [];
 
-            if (this.messages && this.messages.hasOwnProperty(path)) {
-                var messages = this.messages[path];
-                for (var i = 0; i < messages.length; i++) {
-                    var message = messages[i],
-                        $line = $('#L' + message.line),
-                        title = $line.attr('title'),
-                        $dom = $('<div>').append($('<strong>').html(format('{0}{1}: {2}',
-                                                                           message.type[0].toUpperCase(),
-                                                                           message.type.substr(1),
-                                                                           message.message)));
+            if (this.messages) {
+                if (this.messages.hasOwnProperty(""))
+                    messages = messages.concat(this.messages[""]);
+                if (this.messages.hasOwnProperty(path))
+                    messages = messages.concat(this.messages[path]);
+            }
 
-                    $.each([].concat(message.description), function(i, msg) {
-                        $dom.append($('<p>').html(String(message.description)));
-                    });
+            for (var i = 0; i < messages.length; i++) {
+                var message = messages[i],
+                    $line = $('#L' + message.line),
+                    title = $line.attr('title'),
+                    $dom = $('<div>').append($('<strong>').html(format('{0}{1}: {2}',
+                                                                       message.type[0].toUpperCase(),
+                                                                       message.type.substr(1),
+                                                                       message.message)));
 
-                    if (message.line != null && $line.length) {
-                        $line.addClass(message.type)
-                             .parent()
-                             .appendMessage($dom);
+                $.each([].concat(message.description), function(i, msg) {
+                    $dom.append($('<p>').html(String(message.description)));
+                });
 
-                        $('.code .' + $line.parent().attr('class').match(/number\d+/)[0] + ':eq(0)')
-                             .addClass(message.type);
-                    } else {
-                        $('#diff-wrapper').before(
-                            $('<div>', { 'class': 'notification-box' })
-                                .addClass(this.message_type_map[message.type])
-                                .append($dom));
-                    }
+                if (message.line != null && $line.length) {
+                    $line.addClass(message.type)
+                         .parent()
+                         .appendMessage($dom);
+
+                    $('.code .' + $line.parent().attr('class').match(/number\d+/)[0] + ':eq(0)')
+                         .addClass(message.type);
+                } else {
+                    $('#diff-wrapper').before(
+                        $('<div>', { 'class': 'notification-box' })
+                            .addClass(this.message_type_map[message.type])
+                            .append($dom));
                 }
             }
 
@@ -375,10 +380,16 @@ function bind_viewer(nodes) {
 
                 this.known_files = {};
                 var metadata = data.validation.metadata;
-                if (metadata && metadata.jetpack_identified_files) {
-                    var files = metadata.jetpack_identified_files;
-                    for (var file in files) {
-                        this.known_files[file] = ['JetPack'].concat(files[file]);
+                if (metadata) {
+                    if (metadata.jetpack_sdk_version)
+                        $('#jetpack-version').show()
+                            .find('span').text(metadata.jetpack_sdk_version);
+
+                    if (metadata.jetpack_identified_files) {
+                        var files = metadata.jetpack_identified_files;
+                        for (var file in files) {
+                            this.known_files[file] = ['JetPack'].concat(files[file]);
+                        }
                     }
                 }
 

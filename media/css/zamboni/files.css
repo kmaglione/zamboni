@@ -106,6 +106,7 @@
 
 .collapsed-files .command,
 .collapsed-files #toggle-known-container,
+.collapsed-files #jetpack-version,
 .collapsed-files #tab-stops-container {
     display: none !important;
 }
@@ -472,3 +473,6 @@ td.gutter, td.code {
     margin-top: .3em;
 }
 
+#jetpack-version {
+    margin: 1ex 0;
+}
