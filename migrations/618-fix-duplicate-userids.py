@@ -2,7 +2,8 @@ from django.db import connection, transaction
 
 
 def run():
-    from django.db import connection, transaction
+    return
+
     cursor = connection.cursor()
 
     # Link orphaned `auth_user` rows created in getpersonas # migration
