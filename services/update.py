@@ -143,44 +143,11 @@ class Update(object):
         self.is_beta_version = base.VERSION_BETA.search(data['version'])
         return True
 
-    def get_beta(self):
-        data = self.data
-        data['status'] = base.STATUS_PUBLIC
-
-        if data['addon_status'] == base.STATUS_PUBLIC:
-            # Beta channel looks at the addon name to see if it's beta.
-            if self.is_beta_version:
-                # For beta look at the status of the existing files.
-                sql = """
-                    SELECT versions.id, status
-                    FROM files INNER JOIN versions
-                    ON files.version_id = versions.id
-                    WHERE versions.addon_id = %(id)s
-                          AND versions.version = %(version)s LIMIT 1;"""
-                self.cursor.execute(sql, data)
-                result = self.cursor.fetchone()
-                # Only change the status if there are files.
-                if result is not None:
-                    status = result[1]
-                    # If it's in Beta or Public, then we should be looking
-                    # for similar. If not, find something public.
-                    if status in (base.STATUS_BETA, base.STATUS_PUBLIC):
-                        data['status'] = status
-                    else:
-                        data.update(STATUSES_PUBLIC)
-                        self.flags['multiple_status'] = True
-
-        elif data['addon_status'] in (base.STATUS_LITE,
-                                      base.STATUS_LITE_AND_NOMINATED):
-            data['status'] = base.STATUS_LITE
-        else:
-            # Otherwise then we'll keep the update within the current version.
-            data['status'] = base.STATUS_NULL
-            self.flags['use_version'] = True
-
     def get_update(self):
-        self.get_beta()
         data = self.data
+
+        data.update(STATUSES_PUBLIC)
+        data['STATUS_BETA'] = base.STATUS_BETA
 
         sql = ["""
             SELECT
@@ -212,17 +179,27 @@ class Update(object):
         if data.get('appOS'):
             sql.append(' OR files.platform_id = %(appOS)s')
 
-        if self.flags['use_version']:
-            sql.append(') WHERE files.status > %(status)s AND '
-                    'versions.version = %(version)s ')
-        else:
-            if self.flags['multiple_status']:
-                # Note that getting this properly escaped is a pain.
-                # Suggestions for improvement welcome.
-                sql.append(') WHERE files.status in (%(STATUS_PUBLIC)s,'
-                        '%(STATUS_LITE)s,%(STATUS_LITE_AND_NOMINATED)s) ')
-            else:
-                sql.append(') WHERE files.status = %(status)s ')
+        sql.append("""
+            )
+            LEFT JOIN versions curver
+                ON curver.addon_id = addons.id AND curver.version = %(version)s
+            LEFT JOIN files curfile
+                ON curfile.version_id = curver.id
+            WHERE
+                CASE
+                WHEN curfile.status = %(STATUS_BETA)s
+                THEN
+                    addons.status = %(STATUS_PUBLIC)s AND
+                    files.status = %(STATUS_BETA)s
+                WHEN addons.status IN (%(STATUS_LITE)s,
+                                       %(STATUS_LITE_AND_NOMINATED)s)
+                   AND (curfile.id IS NULL OR curfile.status = %(STATUS_LITE)s)
+                THEN
+                   files.status = %(STATUS_LITE)s
+                ELSE
+                   files.status = %(STATUS_PUBLIC)s
+                END
+        """)
 
         sql.append('AND appmin.version_int <= %(version_int)s ')
 
@@ -272,8 +249,8 @@ class Update(object):
                 'version', 'premium_type'],
                 list(result)))
             row['type'] = base.ADDON_SLUGS_UPDATE[row['type']]
-            row['url'] = get_mirror(self.data['addon_status'],
-                                    self.data['id'], row)
+            row['url'] = get_mirror(data['addon_status'],
+                                    data['id'], row)
             data['row'] = row
             return True
 

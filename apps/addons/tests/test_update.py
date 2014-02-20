@@ -368,10 +368,24 @@ class TestLookup(amo.tests.TestCase):
         for status in amo.LITE_STATUSES:
             self.addon.update(status=status)
 
+            self.change_status(self.version_1_2_0, amo.STATUS_LITE)
             self.change_status(self.version_1_2_1, amo.STATUS_LITE)
             version, file = self.get('1.2', self.version_int,
                                      self.app, amo.PLATFORM_LINUX)
             eq_(version, self.version_1_2_1)
+
+    def test_file_preliminary_ex_full_addon(self):
+        """
+        If the addon is in prelim. review, user has a full reviewed version.
+        Show the most recent full reviewed version.
+        """
+        self.addon.update(status=amo.STATUS_LITE)
+
+        self.change_status(self.version_1_2_0, amo.STATUS_PUBLIC)
+        self.change_status(self.version_1_2_2, amo.STATUS_LITE)
+        version, file = self.get('1.2', self.version_int,
+                                 self.app, amo.PLATFORM_LINUX)
+        eq_(version, self.version_1_2_1)
 
 
 class TestDefaultToCompat(amo.tests.TestCase):
@@ -662,6 +676,8 @@ class TestResponse(amo.tests.TestCase):
         version = file.version
         version.version = beta_version
         version.save()
+
+        version.addon.update(status=amo.STATUS_PUBLIC)
 
         data = self.good_data.copy()
         up = self.get(data)
