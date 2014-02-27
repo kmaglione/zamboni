@@ -332,15 +332,17 @@ class SearchView(APIView):
         }
 
         # Opts may get overridden by query string filters.
+        # Note that we do not filter compatible app versions here,
+        # since the compatible_version query below takes care of
+        # this at the version, rather than add-on, level.
         opts = {
             'addon_type': addon_type,
-            'platform': platform,
-            'version': version,
         }
 
         if self.version < 1.5:
             # By default we show public addons only for api_version < 1.5.
-            filters['status__in'] = [amo.STATUS_PUBLIC]
+            # We do this for all API versions now.
+            # filters['status__in'] = [amo.STATUS_PUBLIC]
 
             # Fix doubly encoded query strings.
             try:
@@ -357,13 +359,6 @@ class SearchView(APIView):
             # Filter by ALL types, which is really all types except for apps.
             filters['type__in'] = list(amo.ADDON_SEARCH_TYPES)
         qs = qs.filter(**filters)
-
-        if qs_filters.get('platform__in', []):
-            # More than one platform, pluck it out.
-            platforms = qs_filters.get('platform__in')[:]
-            platforms.remove(1)  # ALL is already queried in compat SQL.
-            if platforms:
-                platform = amo.PLATFORMS[platforms[0]].api_name
 
         addons = qs[:limit]
         total = qs.count()
